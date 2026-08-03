@@ -29,12 +29,20 @@ class PersonalInfo(BaseModel):
 # -----------------------------
 
 class Skills(BaseModel):
-    programming_languages: List[str] = []
-    frameworks: List[str] = []
-    databases: List[str] = []
-    web_technologies: List[str] = []
-    ai_ml: List[str] = []
-    tools: List[str] = []
+    programming_languages: List[str] = Field(default_factory=list)
+    frameworks: List[str] = Field(default_factory=list)
+    databases: List[str] = Field(default_factory=list)
+    web_technologies: List[str] = Field(default_factory=list)
+    ai_ml: List[str] = Field(default_factory=list)
+    cloud: List[str] = Field(default_factory=list)
+    devops: List[str] = Field(default_factory=list)
+    mobile: List[str] = Field(default_factory=list)
+    testing: List[str] = Field(default_factory=list)
+    tools: List[str] = Field(default_factory=list)
+    operating_systems: List[str] = Field(default_factory=list)
+    embedded_iot: List[str] = Field(default_factory=list)
+    concepts: List[str] = Field(default_factory=list)
+    soft_skills: List[str] = Field(default_factory=list)
 
 
 # -----------------------------

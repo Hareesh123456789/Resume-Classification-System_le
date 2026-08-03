@@ -1,0 +1,23 @@
+{
+  "category": "operating_systems",
+  "skills": [
+    "Windows",
+    "Windows Server",
+    "Linux",
+    "Ubuntu",
+    "Debian",
+    "Fedora",
+    "CentOS",
+    "Red Hat Enterprise Linux",
+    "RHEL",
+    "Kali Linux",
+    "Arch Linux",
+    "Unix",
+    "macOS",
+    "Android",
+    "iOS",
+    "Raspberry Pi OS",
+    "FreeRTOS",
+    "Embedded Linux"
+  ]
+}

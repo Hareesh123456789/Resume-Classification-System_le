@@ -1,0 +1,43 @@
+{
+    "category": "programming_languages",
+
+    "skills": [
+
+        "Python",
+        "Java",
+        "C",
+        "C++",
+        "C#",
+        "JavaScript",
+        "TypeScript",
+        "Go",
+        "Rust",
+        "Kotlin",
+        "Swift",
+        "PHP",
+        "Ruby",
+        "R",
+        "MATLAB",
+        "Scala",
+        "Perl",
+        "Dart",
+        "Lua",
+        "Shell",
+        "Bash",
+        "PowerShell",
+        "SQL",
+        "PL/SQL",
+        "Objective-C",
+        "Fortran",
+        "COBOL",
+        "Julia",
+        "Groovy",
+        "Haskell",
+        "Assembly",
+        "VB.NET",
+        "Visual Basic",
+        "Pascal",
+        "Lisp",
+        "Prolog"
+    ]
+}
