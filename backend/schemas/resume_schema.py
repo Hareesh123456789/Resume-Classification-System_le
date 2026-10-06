@@ -7,7 +7,7 @@ Defines the standard structure of a parsed resume.
 """
 
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # -----------------------------
