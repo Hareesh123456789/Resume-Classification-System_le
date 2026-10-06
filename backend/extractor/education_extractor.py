@@ -1,238 +1,305 @@
-"""Extract education records from an education section or a full resume.
-
-Uses local text rules, not an AI model. Missing details remain None.
-"""
+"""Extract employment and internships from resume text."""
 
 import re
 
 
-DEGREES = (
-    ("Ph.D", r"ph\.?\s*d\.?|doctor\s+of\s+philosophy"),
-    ("M.Tech", r"m\.?\s*tech\.?|master\s+of\s+technology"),
-    ("B.Tech", r"b\.?\s*tech\.?|bachelor\s+of\s+technology"),
-    ("M.E", r"m\.\s*e\.?|(?-i:ME)|master\s+of\s+engineering"),
-    ("B.E", r"b\.\s*e\.?|(?-i:BE)|bachelor\s+of\s+engineering"),
-    ("M.Sc", r"m\.?\s*sc\.?|master\s+of\s+science"),
-    ("B.Sc", r"b\.?\s*sc\.?|bachelor\s+of\s+science"),
-    ("M.Com", r"m\.?\s*com\.?|master\s+of\s+commerce"),
-    ("B.Com", r"b\.?\s*com\.?|bachelor\s+of\s+commerce"),
-    ("MBA", r"m\.?\s*b\.?\s*a\.?|master\s+of\s+business\s+administration"),
-    ("BBA", r"b\.?\s*b\.?\s*a\.?|bachelor\s+of\s+business\s+administration"),
-    ("MCA", r"m\.?\s*c\.?\s*a\.?|master\s+of\s+computer\s+applications?"),
-    ("BCA", r"b\.?\s*c\.?\s*a\.?|bachelor\s+of\s+computer\s+applications?"),
-    ("M.A", r"m\.\s*a\.?|(?-i:MA)|master\s+of\s+arts"),
-    ("B.A", r"b\.\s*a\.?|(?-i:BA)|bachelor\s+of\s+arts"),
-    ("Diploma", r"d[ \t]*i[ \t]*p[ \t]*l[ \t]*o[ \t]*m[ \t]*a"),
-    ("Class 12", r"class\s*(?:12(?:th)?|xii)|12th|hsc|intermediate|higher\s+secondary"),
-    ("Class 10", r"class\s*(?:10(?:th)?|x)|10th|ssc|matriculation|secondary\s+school\s+certificate"),
-)
-DEGREE_PATTERNS = [
-    (name, re.compile(r"(?<!\w)(?:" + pattern + r")(?!\w)", re.I))
-    for name, pattern in DEGREES
-]
-EDUCATION_HEADING = re.compile(
-    r"^\s*(?:education(?:al)?(?:\s+(?:qualifications?|details|background))?"
-    r"|academic\s+(?:profile|details|qualifications?|background)"
-    r"|qualifications?)\s*:?[ \t]*$", re.I | re.M
-)
-OTHER_HEADING = re.compile(
-    r"^\s*(?:technical\s+skills|skills|(?:work|professional)\s+experience"
-    r"|experience|(?:academic\s+)?projects?(?:\s+experience)?"
-    r"|certifications?|achievements?|internships?|career\s+objective"
-    r"|summary|personal\s+details|declaration|languages|interests)\s*:?[ \t]*$",
+EXPERIENCE_HEADING = re.compile(
+    r"^[ \t]*(?:(?:(?:work|professional|employment|internship|intership)[ \t]+)?"
+    r"exper(?:ience|ince)|employment[ \t]+history|work[ \t]+history|internships?)"
+    r"[ \t]*:?[ \t]*$",
     re.I | re.M,
 )
+
+OTHER_HEADING = re.compile(
+    r"^[ \t]*(?:education(?:al)?(?:[ \t]+qualifications?)?"
+    r"|academic[ \t]+(?:profile|background)"
+    r"|(?:technical[ \t]+)?skills"
+    r"|(?:academic[ \t]+)?projects?(?:[ \t]+experience)?"
+    r"|certifications?|achievements?|key[ \t]+achievements"
+    r"|career[ \t]+objective|summary|personal[ \t]+details"
+    r"|declaration|languages|interests)"
+    r"[ \t]*:?[ \t]*$",
+    re.I | re.M,
+)
+
+MONTH = (
+    r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May"
+    r"|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?"
+    r"|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+)
+
 YEAR = r"(?:19|20)\d{2}"
-RANGE = re.compile(r"\b(" + YEAR + r")\s*(?:-|\u2013|\u2014|to)\s*(" + YEAR + r"|present|current|ongoing)\b", re.I)
-FIELDS = ("degree", "specialization", "institution", "university", "year", "score")
+
+DATE = (
+    r"(?:"
+    + MONTH
+    + r"\.?[ \t]*"
+    + YEAR
+    + r"|"
+    + YEAR
+    + r"[-/](?:0?[1-9]|1[0-2])"
+    + r"|(?:0?[1-9]|1[0-2])[-/]"
+    + YEAR
+    + r"|"
+    + YEAR
+    + r")"
+)
+
+DATE_RANGE = re.compile(
+    r"(?<![\w/])("
+    + DATE
+    + r")[ \t]*(?:-|\u2013|\u2014|to)[ \t]*("
+    + DATE
+    + r"|present|current|ongoing)(?!\w)",
+    re.I,
+)
+
+ROLE = re.compile(
+    r"\b(?:engineer|developer|intern|trainee|analyst|manager"
+    r"|consultant|designer|scientist|tester|administrator"
+    r"|specialist|assistant|researcher|accountant|executive"
+    r"|technician|coordinator|associate|lead)\b",
+    re.I,
+)
+
+COMPANY = re.compile(
+    r"\b(?:ltd|limited|inc|pvt|llc|corporation"
+    r"|technologies|solutions|systems|labs)\b",
+    re.I,
+)
+
+ACTION = re.compile(
+    r"^(?:developed|built|created|maintained|implemented"
+    r"|worked|managed|responsible|led|designed|assisted"
+    r"|seeking|looking|learned|completed|improved)\b",
+    re.I,
+)
+
+LABEL = re.compile(
+    r"^(company|employer|organization|organisation|role"
+    r"|position|job[ \t]+title|duration|dates|description)"
+    r"[ \t]*:[ \t]*(.*)$",
+    re.I,
+)
+
+LABEL_FIELDS = {
+    "company": "company",
+    "employer": "company",
+    "organization": "company",
+    "organisation": "company",
+    "role": "role",
+    "position": "role",
+    "job title": "role",
+    "duration": "duration",
+    "dates": "duration",
+    "description": "description",
+}
 
 
-def _education_text(text):
-    text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\xa0", " ")
-    heading = EDUCATION_HEADING.search(text)
-    if heading:
-        text = text[heading.end():]
-        end = OTHER_HEADING.search(text)
-        if end:
-            text = text[:end.start()]
-    return text.strip()
-
-
-def _year(block):
-    labeled = re.search(
-        r"(?:passing\s+year|year\s+of\s+(?:passing|graduation)|graduated|graduation|expected)"
-        r"\s*[:\-]?\s*(?:in\s+)?(" + YEAR + r")\b", block, re.I
+def _section(text):
+    text = (
+        text.replace("\r\n", "\n")
+        .replace("\r", "\n")
+        .replace("\xa0", " ")
     )
-    if labeled:
-        return labeled.group(1)
-    span = RANGE.search(block)
-    if span:
-        return span.group(2) if span.group(2).isdigit() else None
-    if re.search(r"\b(?:pursuing|ongoing|present|currently)\b", block, re.I):
-        return None
-    years = set(re.findall(r"\b(" + YEAR + r")\b", block))
-    # Unlabeled, conflicting years cannot be resolved by selecting the last one.
-    return next(iter(years)) if len(years) == 1 else None
+
+    match = EXPERIENCE_HEADING.search(text)
+
+    if match:
+        text = text[match.end():]
+        end = OTHER_HEADING.search(text)
+        return text[:end.start()] if end else text
+
+    # Do not mistake projects or career objectives for employment.
+    return "" if OTHER_HEADING.search(text) else text
 
 
-def _score(block):
-    number = r"\d{1,2}(?:\.\d+)?"
-    value = number + r"(?:\s*/\s*(?:10|4)(?:\.0)?)?"
-    prefix = re.search(r"\b(CGPA|GPA)\s*[:=\-]?\s*(" + value + r")(?![\d.])", block, re.I)
-    suffix = re.search(r"(?<![\d.])(" + value + r")\s*\(?\s*(CGPA|GPA)\b", block, re.I)
-    if prefix or suffix:
-        match = prefix or suffix
-        label, result = (match.group(1), match.group(2)) if prefix else (match.group(2), match.group(1))
-        result = re.sub(r"\s+", "", result)
-        parts = result.split("/")
-        maximum = float(parts[1]) if len(parts) == 2 else 10
-        if 0 <= float(parts[0]) <= maximum:
-            return result + " (" + label.upper() + ")"
-        return None
-    percent = re.search(r"(?<![\d.])(\d{1,3}(?:\.\d+)?)\s*(?:%|percent\b)", block, re.I)
-    if percent and 0 <= float(percent.group(1)) <= 100:
-        return percent.group(1) + "%"
-    cells = _cells(block)
-    # A table may contain an unlabeled score after the passing year. Retain the
-    # value, but do not infer a CGPA denominator or percentage from its size.
-    seen_year = False
-    raw_scores = []
-    for cell in cells:
-        if re.search(r"\b" + YEAR + r"\b", cell):
-            seen_year = True
-        elif seen_year and re.fullmatch(r"\d{1,3}(?:\.\d+)?", cell):
-            if 0 <= float(cell) <= 100:
-                raw_scores.append(cell)
-    return raw_scores[0] if len(raw_scores) == 1 else None
+def _line(text):
+    return re.sub(
+        r"^[ \t]*(?:[\u2022*\-]+[ \t]*|\d+[.)][ \t]+)",
+        "",
+        text,
+    ).strip()
 
 
-def _cells(block):
-    return [p.strip(" ;:-") for p in re.split(r"\n|\||\t|\s{2,}", block) if p.strip(" ;:-")]
+def _looks_role(text):
+    return (
+        bool(ROLE.search(text))
+        and len(text.split()) <= 12
+        and not ACTION.match(text)
+        and not COMPANY.search(text)
+    )
 
 
-def _organization(cell):
-    cell = re.sub(r"^(?:institution|college|school|university|board)\s*:\s*", "", cell, flags=re.I)
-    cell = re.sub(r"^affiliated\s+to\s+", "", cell, flags=re.I)
-    cell = re.split(r"\b" + YEAR + r"\b|\b(?:CGPA|GPA)\b|\b\d+(?:\.\d+)?\s*%", cell, maxsplit=1, flags=re.I)[0]
-    return cell.strip(" ;:-()") or None
+def _header(text):
+    parts = [
+        part.strip(" ,;|-\u2013\u2014")
+        for part in re.split(
+            r"\||[ \t]+(?:-|\u2013|\u2014|at|@)[ \t]+",
+            text,
+            flags=re.I,
+        )
+    ]
+
+    parts = [part for part in parts if part]
+
+    if len(parts) >= 2:
+        if _looks_role(parts[0]):
+            return parts[0], " | ".join(parts[1:])
+
+        if _looks_role(parts[1]):
+            return parts[1], parts[0]
+
+    if "," in text:
+        left, right = text.split(",", 1)
+
+        if _looks_role(left.strip()) and COMPANY.search(right):
+            return left.strip(), right.strip()
+
+    return (text, None) if _looks_role(text) else (None, None)
 
 
-BOARD = re.compile(r"\b(?:board|CBSE|ICSE|SBTET(?:-\w+)?|BIE|BSE)\b", re.I)
-UNIVERSITY = re.compile(r"\b(?:university|JNTU\w*)\b", re.I)
-INSTITUTION = re.compile(r"\b(?:college|institute|institution|polytechnic|school|university)\b", re.I)
+def _empty():
+    return {
+        "company": None,
+        "role": None,
+        "duration": None,
+        "description": None,
+    }
 
 
-def _is_field(cell):
-    if re.search(r"\b" + YEAR + r"\b", cell):
-        return True
-    if re.fullmatch(r"\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?\s*%?", cell):
-        return True
-    return bool(re.search(
-        r"\b(?:CGPA|GPA|percentage|score|marks|specialization|specialisation|branch|major|duration|year)\b",
-        cell, re.I
-    ))
-
-
-def _organizations(block):
-    institution = None
-    university = None
-    cells = _cells(block)
-    consumed = set()
-    for index, cell in enumerate(cells):
-        if index in consumed:
-            continue
-        # Degree + institution on one row: ignore the degree prefix.
-        matches = [p.search(cell) for _, p in DEGREE_PATTERNS]
-        matches = [m for m in matches if m]
-        if matches:
-            first = min(matches, key=lambda m: m.start())
-            tail = cell[first.end():].lstrip(" ,;:-")
-            if re.match(r"in\s", tail, re.I) and "," in tail:
-                tail = tail.split(",", 1)[1]
-            cell = tail.strip()
-        if not cell:
-            continue
-        name = _organization(cell)
-        if not name:
-            continue
-        is_board = BOARD.search(name)
-        is_university = UNIVERSITY.search(name)
-        is_institution = INSTITUTION.search(name)
-        if not (is_board or is_university or is_institution):
-            continue
-        # Preserve a common institution prefix split onto the preceding line.
-        if index and re.fullmatch(r"(?:government|govt\.?|private|public|national|state)", cells[index - 1], re.I):
-            name = cells[index - 1] + " " + name
-        for next_index in range(index + 1, min(index + 6, len(cells))):
-            candidate = cells[next_index]
-            if _is_field(candidate) or OTHER_HEADING.fullmatch(candidate):
-                break
-            if any(p.search(candidate) for _, p in DEGREE_PATTERNS):
-                break
-            if BOARD.search(candidate) or UNIVERSITY.search(candidate) or INSTITUTION.search(candidate):
-                break
-            part = _organization(candidate)
-            if not part:
-                break
-            name += " " + part
-            consumed.add(next_index)
-        name = re.sub(r"\s+,", ",", re.sub(r"\s+", " ", name)).strip(" ,;:-()")
-        if (is_board or is_university) and not university:
-            university = name
-        if is_institution and not is_board and not institution:
-            institution = name
-    return institution, university
-
-
-def _specialization(block, degree_match):
-    labeled = re.search(r"\b(?:specialization|specialisation|branch|major)\s*:\s*([^\n|;]+)", block, re.I)
-    if labeled:
-        value = labeled.group(1)
-    else:
-        tail = block[degree_match.end():].split("\n", 1)[0].lstrip(" ,;:|\t-")
-        tail = re.split(r"\||;|,|\b" + YEAR + r"\b|\b(?:CGPA|GPA)\b", tail, maxsplit=1, flags=re.I)[0]
-        value = re.sub(r"^\s*(?:in\s+|[-:]\s*)", "", tail, flags=re.I).strip()
-        if re.search(r"\b(?:college|institute|university|school|board|pursuing)\b", value, re.I):
-            return None
-    value = value.strip(" ,;:.-()")
-    # Normalize split technical acronyms; never remove spaces from arbitrary
-    # institution names, where the correct spelling cannot be established.
-    for acronym in ("CSE", "ECE", "EEE", "AIML", "AI", "ML", "IT"):
-        pattern = r"(?<!\w)" + r"[ \t]*".join(acronym) + r"(?!\w)"
-        value = re.sub(pattern, acronym, value, flags=re.I)
-    return value or None
-
-
-def extract_education(text):
-    """Return a list of dicts compatible with schemas.resume_schema.Education.
-
-    Pass the education section when available. Full resumes need a recognizable
-    education heading to isolate education from unrelated degree mentions.
-    """
+def extract_experience(text):
+    """Extract experience records, preserving missing fields as None."""
     if not isinstance(text, str):
-        raise TypeError("Education input must be text.")
-    section = _education_text(text)
-    if not section:
-        return []
-    entries = []
-    offset = 0
-    for line in section.splitlines(keepends=True):
-        found = [(name, pattern.search(line)) for name, pattern in DEGREE_PATTERNS]
-        found = [(name, match) for name, match in found if match]
-        if found:
-            name, match = min(found, key=lambda item: (item[1].start(), -len(item[1].group())))
-            entries.append((offset, name))
-        offset += len(line)
+        raise TypeError("Experience input must be text.")
+
+    section = _section(text)
     records = []
-    for i, (start, degree) in enumerate(entries):
-        end = entries[i + 1][0] if i + 1 < len(entries) else len(section)
-        block = section[start:end]
-        institution, university = _organizations(block)
-        # Specialization matching needs positions relative to this block.
-        pattern = next(p for name, p in DEGREE_PATTERNS if name == degree)
-        degree_match = pattern.search(block)
-        record = dict(zip(FIELDS, (degree, _specialization(block, degree_match),
-                                  institution, university, _year(block), _score(block))))
-        if record not in records:
-            records.append(record)
+    current = None
+    description = []
+
+    def finish():
+        nonlocal current, description
+
+        if current and (current["role"] or current["company"]):
+            current["description"] = (
+                "\n".join(description).strip() or None
+            )
+
+            if current not in records:
+                records.append(current)
+
+        current = None
+        description = []
+
+    for raw in section.splitlines():
+        line = _line(raw)
+
+        if not line or EXPERIENCE_HEADING.fullmatch(line):
+            continue
+
+        label = LABEL.match(line)
+
+        if label:
+            label_name = re.sub(
+                r"[ \t]+",
+                " ",
+                label.group(1).lower(),
+            )
+            field = LABEL_FIELDS[label_name]
+            value = label.group(2).strip() or None
+
+            if (
+                field in ("company", "role")
+                and current
+                and current[field]
+            ):
+                finish()
+
+            if current is None:
+                current = _empty()
+
+            if field == "description":
+                if value:
+                    description.append(value)
+            else:
+                current[field] = value
+
+            continue
+
+        date = DATE_RANGE.search(line)
+
+        duration = (
+            date.group(1) + " - " + date.group(2)
+            if date
+            else None
+        )
+
+        content = (
+            (line[:date.start()] + line[date.end():]).strip(
+                " ,;|-\u2013\u2014"
+            )
+            if date
+            else line
+        )
+
+        is_bullet = bool(
+            re.match(
+                r"^[ \t]*(?:[\u2022*\-]+[ \t]+|\d+[.)][ \t]+)",
+                raw,
+            )
+        )
+
+        role, company = (
+            _header(content) if content else (None, None)
+        )
+
+        if is_bullet and not company:
+            role = None
+
+        if role:
+            if current and current["role"]:
+                finish()
+
+            if current is None:
+                current = _empty()
+
+            current["role"] = role
+
+            if company:
+                current["company"] = company
+
+            if duration:
+                current["duration"] = duration
+
+            continue
+
+        if (
+            content
+            and COMPANY.search(content)
+            and not ACTION.match(content)
+            and not is_bullet
+            and len(content.split()) <= 12
+        ):
+            if current and current["company"]:
+                finish()
+
+            if current is None:
+                current = _empty()
+
+            current["company"] = content
+
+            if duration:
+                current["duration"] = duration
+
+            continue
+
+        if current:
+            if duration:
+                current["duration"] = duration
+
+            if content:
+                description.append(content)
+
+    finish()
     return records
